@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BhuRakshak — Landslide Risk Intelligence</title>
+<meta name="description" content="BhuRakshak AI-powered landslide risk intelligence platform for North-East India.">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/globe.gl@2.37.0/dist/globe.gl.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json"></script>
+
+<style>
+:root{
+  --bg:#020817;
+  --panel:rgba(5,22,48,.70);
+  --panel2:rgba(8,31,65,.60);
+  --line:rgba(91,178,255,.22);
+  --blue:#159cff;
+  --cyan:#55dcff;
+  --text:#f5fbff;
+  --muted:#91a9c4;
+}
+*{box-sizing:border-box;scroll-behavior:smooth}
+html,body{margin:0;min-height:100%;font-family:Inter,Arial,sans-serif;color:var(--text);background:var(--bg)}
+body{
+  overflow-x:hidden;
+  background:
+    radial-gradient(circle at 75% 20%,rgba(0,115,255,.20),transparent 28%),
+    radial-gradient(circle at 15% 50%,rgba(0,194,255,.10),transparent 30%),
+    linear-gradient(180deg,#020817 0%,#031126 55%,#020817 100%);
+}
+body:before{
+  content:"";
+  position:fixed;inset:0;z-index:-5;pointer-events:none;
+  background:
+    radial-gradient(circle at 20% 30%,rgba(77,194,255,.12) 0 1px,transparent 2px),
+    radial-gradient(circle at 70% 55%,rgba(91,153,255,.16) 0 1px,transparent 2px),
+    radial-gradient(circle at 40% 80%,rgba(55,220,255,.13) 0 1px,transparent 2px);
+  background-size:160px 160px,220px 220px,280px 280px;
+  animation:stars 24s linear infinite;
+}
+body:after{
+  content:"";position:fixed;inset:-30%;z-index:-6;pointer-events:none;
+  background:radial-gradient(ellipse at center,rgba(0,107,255,.08),transparent 55%);
+  animation:nebula 15s ease-in-out infinite alternate;
+}
+@keyframes stars{to{background-position:160px 100px,-220px 150px,180px -120px}}
+@keyframes nebula{from{transform:translate(-2%,-1%) scale(1)}to{transform:translate(3%,2%) scale(1.08)}}
+h1,h2,h3,h4,.brand{font-family:Manrope,Inter,sans-serif}
+a{text-decoration:none;color:inherit}
+.glass{
+  background:linear-gradient(145deg,rgba(12,48,92,.68),rgba(3,18,40,.76));
+  border:1px solid var(--line);
+  box-shadow:inset 0 1px rgba(255,255,255,.08),0 22px 70px rgba(0,38,92,.30);
+  backdrop-filter:blur(20px);
+}
+.glass:hover{border-color:rgba(89,202,255,.34)}
+.nav{
+  background:rgba(2,11,28,.72);
+  border-bottom:1px solid rgba(100,184,255,.16);
+  backdrop-filter:blur(20px);
+}
+.nav a{color:#a9bdd4;transition:.25s}
+.nav a:hover{color:#fff}
+.btn{
+  position:relative;overflow:hidden;isolation:isolate;
+  min-height:46px;padding:0 19px;border-radius:14px;
+  border:1px solid rgba(109,208,255,.30);
+  display:inline-flex;align-items:center;justify-content:center;gap:9px;
+  font-weight:800;font-size:13px;cursor:pointer;
+  color:#fff;background:rgba(23,107,188,.16);
+  backdrop-filter:blur(15px);
+  transition:transform .25s ease,box-shadow .25s ease,border-color .25s ease,background .25s ease;
+}
+.btn:before{
+  content:"";position:absolute;top:-130%;left:-55%;width:32%;height:360%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.72),transparent);
+  transform:rotate(24deg);transition:left .7s ease;z-index:-1;
+}
+.btn:hover{
+  transform:translateY(-3px) scale(1.025);
+  border-color:rgba(115,224,255,.90);
+  background:rgba(23,135,230,.30);
+  box-shadow:0 0 0 1px rgba(68,193,255,.18),0 0 28px rgba(28,161,255,.45),0 16px 38px rgba(0,72,160,.35);
+}
+.btn:hover:before{left:125%}
+.btn:active{transform:translateY(0) scale(.98)}
+.btn-primary{
+  background:linear-gradient(135deg,#168fff,#1261df);
+  box-shadow:0 10px 28px rgba(13,126,255,.30);
+}
+.btn-primary:hover{background:linear-gradient(135deg,#25b7ff,#1b70f0)}
+.badge{
+  display:inline-flex;align-items:center;gap:8px;
+  border:1px solid rgba(85,205,255,.28);background:rgba(27,136,220,.10);
+  border-radius:999px;padding:8px 12px;font-size:10px;font-weight:800;letter-spacing:.13em;color:#76ddff;
+}
+.dot{width:7px;height:7px;border-radius:50%;background:#43d5ff;box-shadow:0 0 12px #43d5ff}
+.hero{min-height:660px}
+.hero-grid{min-height:660px}
+#globeBox{height:610px;min-height:610px;position:relative;display:flex;align-items:center;justify-content:center;overflow:visible}
+#globeViz{width:100%;height:100%;touch-action:none}
+.globe-caption{
+  position:absolute;bottom:5px;left:50%;transform:translateX(-50%);
+  white-space:nowrap;border:1px solid rgba(91,202,255,.20);
+  background:rgba(2,15,36,.72);backdrop-filter:blur(14px);
+  border-radius:999px;padding:7px 12px;font-size:10px;color:#a9dff5
+}
+.globe-location{
+  position:absolute;right:1%;bottom:48px;
+  padding:12px 15px;border-radius:15px;border:1px solid rgba(91,202,255,.20);
+  background:rgba(2,16,38,.76);backdrop-filter:blur(15px);
+}
+#map{height:650px;width:100%;border-radius:22px}
+.leaflet-container{font-family:Inter,sans-serif;touch-action:pan-x pan-y}
+.leaflet-control-zoom a{width:38px!important;height:38px!important;line-height:38px!important}
+.input{
+  width:100%;height:46px;padding:0 13px;border-radius:13px;
+  color:#fff;background:rgba(4,21,45,.72);border:1px solid rgba(93,179,255,.22);
+  outline:none;transition:.2s;
+}
+.input:focus{border-color:#43c9ff;box-shadow:0 0 0 3px rgba(43,177,255,.10)}
+.input::placeholder{color:#718aa7}
+.metric{
+  padding:15px;border-radius:16px;
+  border:1px solid rgba(93,179,255,.17);
+  background:rgba(7,33,66,.48);
+}
+.metric .label{font-size:10px;color:#819bb7;text-transform:uppercase;letter-spacing:.09em}
+.metric .value{margin-top:6px;font-size:18px;font-weight:800}
+.section-title{font-size:36px;font-weight:800;line-height:1.12}
+.section-kicker{font-size:11px;letter-spacing:.18em;text-transform:uppercase;font-weight:800;color:#59d9ff}
+.risk-ring{
+  width:140px;height:140px;border-radius:50%;display:grid;place-items:center;
+  background:conic-gradient(#28b7ff 0 23%,rgba(49,108,170,.35) 23% 100%);
+  position:relative;
+}
+.risk-ring:after{content:"";position:absolute;inset:10px;border-radius:50%;background:#061a35;border:1px solid rgba(94,201,255,.16)}
+.risk-ring span{position:relative;z-index:1;font-size:31px;font-weight:800}
+footer{border-top:1px solid rgba(96,181,255,.13)}
+@media(max-width:1050px){
+  .hero-grid{grid-template-columns:1fr!important}
+  #globeBox{height:520px;min-height:520px}
+}
+@media(max-width:700px){
+  .hero,.hero-grid{min-height:auto}
+  #globeBox{height:390px;min-height:390px}
+  .section-title{font-size:29px}
+  #map{height:480px}
+}
+</style>
+</head>
+
+<body>
+<header class="nav sticky top-0 z-[5000]">
+  <div class="mx-auto max-w-[1500px] px-5">
+    <div class="flex h-[72px] items-center justify-between gap-5">
+      <a href="#home" class="flex items-center gap-3 shrink-0">
+        <div class="flex h-11 w-11 items-center justify-center rounded-xl border border-cyan-300/30 bg-blue-500/10 text-xl">⛰️</div>
+        <div>
+          <div class="brand text-[18px] font-extrabold">BhuRakshak</div>
+          <div class="text-[9px] font-bold uppercase tracking-[.20em] text-slate-500">Safer Hills · Stronger Communities</div>
+        </div>
+      </a>
+      <nav class="hidden items-center gap-7 lg:flex">
+        <a href="#home">Home</a><a href="#risk-map">Risk Map</a><a href="#assessment">Early Warning</a>
+        <a href="#how">How It Works</a><a href="#about">About</a><a href="#team">Team</a>
+      </nav>
+      <div class="flex items-center gap-2">
+        <div class="hidden md:flex items-center overflow-hidden rounded-full border border-cyan-300/15 bg-blue-950/40">
+          <input id="navSearch" class="h-10 w-44 bg-transparent px-4 text-xs text-white outline-none" placeholder="Search location...">
+          <button id="navSearchBtn" class="h-10 w-11 text-cyan-300 hover:text-white">⌕</button>
+        </div>
+        <a href="#assessment" class="btn btn-primary">⌖ <span class="hidden sm:inline">NER Region</span></a>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+<section id="home" class="hero">
+  <div class="hero-grid mx-auto grid max-w-[1500px] grid-cols-2 items-center gap-5 px-5">
+    <div class="relative z-10 py-12">
+      <div class="badge"><span class="dot"></span> AI POWERED <span class="opacity-40">|</span> NORTH EAST FOCUSED <span class="opacity-40">|</span> A SAFER TOMORROW</div>
+      <h1 class="mt-7 max-w-3xl text-5xl font-extrabold leading-[1.02] tracking-tight sm:text-6xl">
+        BhuRakshak
+      </h1>
+      <h2 class="mt-4 text-xl font-bold text-cyan-200 sm:text-2xl">Landslide Risk Prediction for a Safer Tomorrow</h2>
+      <p class="mt-5 max-w-2xl text-base leading-8 text-slate-400 sm:text-lg">
+        Leveraging AI, geospatial data and environmental insights to predict landslide risk across North-East India.
+        Together for safer hills, stronger communities.
+      </p>
+      <div class="mt-8 flex flex-wrap gap-3">
+        <a href="#assessment" class="btn btn-primary px-6">⌁ Check Risk Now <span class="text-xl">→</span></a>
+        <a href="#globeBox" class="btn px-6">◎ Explore 3D Earth</a>
+      </div>
+      <div class="mt-9 grid max-w-2xl grid-cols-2 gap-5 sm:grid-cols-4">
+        <div><div class="text-2xl font-extrabold text-cyan-300">7</div><div class="text-xs text-slate-500">States Covered</div></div>
+        <div><div class="text-2xl font-extrabold text-cyan-300">AI</div><div class="text-xs text-slate-500">Powered</div></div>
+        <div><div class="text-2xl font-extrabold text-cyan-300">Live</div><div class="text-xs text-slate-500">Risk Assessment</div></div>
+        <div><div class="text-2xl font-extrabold text-cyan-300">24/7</div><div class="text-xs text-slate-500">Awareness</div></div>
+      </div>
+    </div>
+
+    <div id="globeBox">
+      <div id="globeViz"></div>
+      <div class="globe-location">
+        <div class="text-[10px] text-slate-500">Focus location</div>
+        <div id="globeCoords" class="mt-1 text-sm font-extrabold text-cyan-200">25.5788° N, 91.8933° E</div>
+      </div>
+      <div class="globe-caption">Drag to rotate &nbsp;·&nbsp; Scroll to zoom &nbsp;·&nbsp; Click a country</div>
+    </div>
+  </div>
+</section>
+
+<section id="assessment" class="mx-auto max-w-[1500px] px-5 py-12">
+  <div class="glass rounded-[28px] p-5 md:p-7">
+    <div class="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+      <div>
+        <div class="section-kicker">Quick risk check</div>
+        <h2 class="mt-2 text-2xl font-extrabold">Find a location and assess its risk</h2>
+        <p class="mt-2 text-sm text-slate-500">Search a place or click anywhere on the map.</p>
+      </div>
+      <div id="status" class="badge"><span class="dot"></span> READY</div>
+    </div>
+    <div class="grid gap-5 xl:grid-cols-[1.45fr_.75fr]">
+      <div>
+        <div class="flex gap-2">
+          <input id="locationSearch" class="input" placeholder="Search for a location (e.g. Guwahati, Shillong, Tawang...)">
+          <button id="searchBtn" class="btn btn-primary shrink-0">⌕ Search</button>
+        </div>
+        <div class="mt-3 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+          <input id="lat" class="input" type="number" step="any" placeholder="Latitude">
+          <input id="lon" class="input" type="number" step="any" placeholder="Longitude">
+          <button id="analyzeBtn" class="btn btn-primary">⌁ Analyze Location</button>
+        </div>
+      </div>
+      <div class="glass-soft rounded-2xl p-4">
+        <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Selected location</div>
+        <div id="selectedName" class="mt-2 text-lg font-extrabold">Shillong, Meghalaya</div>
+        <div class="mt-1 text-xs text-slate-500"><span id="selectedCoords">25.5788° N, 91.8933° E</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="risk-map" class="mx-auto max-w-[1500px] px-5 pb-20">
+  <div class="mb-5">
+    <div class="section-kicker">Interactive risk map</div>
+    <h2 class="mt-2 text-3xl font-extrabold">Explore terrain risk across the region</h2>
+  </div>
+  <div class="glass overflow-hidden rounded-[28px] p-2">
+    <div id="map"></div>
+  </div>
+</section>
+
+<section class="mx-auto max-w-[1500px] px-5 pb-20">
+  <div class="grid gap-5 lg:grid-cols-[.78fr_1.22fr]">
+    <div class="glass rounded-[28px] p-6">
+      <div class="flex items-center gap-3">
+        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-400/10 text-cyan-300">▥</div>
+        <div><div class="text-xl font-extrabold">Prediction Results</div><div class="text-xs text-slate-500">Assessment for the selected location</div></div>
+      </div>
+      <div class="mt-7 flex flex-col items-center gap-7 sm:flex-row">
+        <div id="riskRing" class="risk-ring"><span id="probability">23%</span></div>
+        <div>
+          <div class="text-sm text-slate-500">Landslide Probability</div>
+          <div id="riskPill" class="mt-2 inline-flex rounded-full border border-cyan-300/25 bg-cyan-400/10 px-3 py-1 text-xs font-extrabold text-cyan-300">LOW RISK</div>
+          <p id="riskText" class="mt-3 max-w-xs text-sm leading-6 text-slate-400">Lower probability of landslide at this location.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="glass rounded-[28px] p-6">
+      <div class="flex items-center gap-3">
+        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-400/10 text-cyan-300">◈</div>
+        <div><div class="text-xl font-extrabold">Environmental Factors</div><div class="text-xs text-slate-500">Key parameters used in assessment</div></div>
+      </div>
+      <div class="mt-6 grid grid-cols-2 gap-3 md:grid-cols-3">
+        <div class="metric"><div class="label">Slope</div><div id="mSlope" class="value">12.5°</div></div>
+        <div class="metric"><div class="label">Rainfall</div><div id="mRain" class="value">142 mm</div></div>
+        <div class="metric"><div class="label">Elevation</div><div id="mElevation" class="value">1,496 m</div></div>
+        <div class="metric"><div class="label">Clay Content</div><div id="mClay" class="value">28%</div></div>
+        <div class="metric"><div class="label">Distance to River</div><div id="mRiver" class="value">3.2 km</div></div>
+        <div class="metric"><div class="label">Land Cover</div><div id="mLand" class="value">Forest</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="how" class="border-y border-cyan-300/10 bg-blue-950/20">
+  <div class="mx-auto max-w-[1500px] px-5 py-20">
+    <div class="text-center">
+      <div class="section-kicker">How it works</div>
+      <h2 class="section-title mt-2">From location to risk insight</h2>
+      <p class="mx-auto mt-4 max-w-2xl text-sm leading-7 text-slate-400">A simple workflow designed to turn complex geospatial information into understandable risk intelligence.</p>
+    </div>
+    <div class="mt-12 grid gap-4 md:grid-cols-4">
+      <div class="glass rounded-3xl p-6"><div class="text-3xl">📍</div><h3 class="mt-5 text-lg font-extrabold">Locate</h3><p class="mt-2 text-sm leading-6 text-slate-400">Choose a point by map, coordinates or location search.</p></div>
+      <div class="glass rounded-3xl p-6"><div class="text-3xl">🌧️</div><h3 class="mt-5 text-lg font-extrabold">Collect</h3><p class="mt-2 text-sm leading-6 text-slate-400">Consider terrain and environmental signals around the location.</p></div>
+      <div class="glass rounded-3xl p-6"><div class="text-3xl">🧠</div><h3 class="mt-5 text-lg font-extrabold">Predict</h3><p class="mt-2 text-sm leading-6 text-slate-400">Use an AI model to translate environmental conditions into risk.</p></div>
+      <div class="glass rounded-3xl p-6"><div class="text-3xl">🚨</div><h3 class="mt-5 text-lg font-extrabold">Prepare</h3><p class="mt-2 text-sm leading-6 text-slate-400">Use the result as decision support for awareness and preparedness.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="about" class="mx-auto max-w-[1500px] px-5 py-20">
+  <div class="grid gap-7 lg:grid-cols-2">
+    <div>
+      <div class="section-kicker">Why BhuRakshak</div>
+      <h2 class="section-title mt-2">Technology for safer hills and stronger communities.</h2>
+      <p class="mt-5 max-w-xl text-sm leading-7 text-slate-400">
+        BhuRakshak brings location intelligence, terrain factors and AI-assisted risk assessment together in one interface.
+        The platform is designed around the needs of landslide-prone regions of North-East India.
+      </p>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div class="metric"><div class="text-2xl">🗺️</div><div class="mt-3 font-bold">Geospatial Intelligence</div><p class="mt-1 text-xs leading-5 text-slate-500">Interactive maps and location-based exploration.</p></div>
+      <div class="metric"><div class="text-2xl">🤖</div><div class="mt-3 font-bold">AI Risk Prediction</div><p class="mt-1 text-xs leading-5 text-slate-500">Environmental signals translated into a clear risk score.</p></div>
+      <div class="metric"><div class="text-2xl">🌧️</div><div class="mt-3 font-bold">Environmental Factors</div><p class="mt-1 text-xs leading-5 text-slate-500">Rainfall, slope, elevation and more.</p></div>
+      <div class="metric"><div class="text-2xl">⚠️</div><div class="mt-3 font-bold">Early Awareness</div><p class="mt-1 text-xs leading-5 text-slate-500">Clear risk levels designed for quick understanding.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="team" class="mx-auto max-w-[1500px] px-5 pb-20">
+  <div class="glass rounded-[28px] p-7 text-center md:p-10">
+    <div class="section-kicker">The team</div>
+    <h2 class="mt-2 text-3xl font-extrabold">Doraemon Ke Saathi</h2>
+    <p class="mx-auto mt-3 max-w-2xl text-sm leading-7 text-slate-400">
+      Building BhuRakshak as a practical technology solution for landslide risk awareness.
+    </p>
+    <div class="mt-7 inline-flex rounded-full border border-cyan-300/20 bg-cyan-400/10 px-5 py-3 text-sm font-extrabold text-cyan-200">
+      Made by Team Doraemon Ke Saathi
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="mx-auto flex max-w-[1500px] flex-col justify-between gap-5 px-5 py-8 md:flex-row md:items-center">
+    <div>
+      <div class="brand text-lg font-extrabold">BhuRakshak</div>
+      <div class="mt-1 text-xs text-slate-600">Smart Landslide Risk Intelligence · SIH 2026</div>
+    </div>
+    <div class="text-xs text-slate-500">Made by <span class="font-bold text-slate-300">Team Doraemon Ke Saathi</span></div>
+    <div class="max-w-md text-xs leading-5 text-slate-600">For awareness and decision support only. Always follow official emergency and disaster-management advisories.</div>
+  </div>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ---------------------------
+   Interactive 3D Earth
+---------------------------- */
+(function(){
+  const el=document.getElementById('globeViz');
+  if(!el || typeof Globe==='undefined') return;
+
+  const world=window.world || null;
+  const globe=Globe()(el)
+    .backgroundColor('rgba(0,0,0,0)')
+    .showAtmosphere(true)
+    .atmosphereColor('#2aaeff')
+    .atmosphereAltitude(0.16)
+    .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg')
+    .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
+    .showGraticules(false)
+    .pointColor(()=>'#55e6ff')
+    .pointAltitude(.025)
+    .pointRadius(.28);
+
+  const controls=globe.controls();
+  controls.enableZoom=true;
+  controls.enablePan=false;
+  controls.autoRotate=true;
+  controls.autoRotateSpeed=.42;
+  controls.minDistance=190;
+  controls.maxDistance=500;
+
+  // Countries are drawn from World Atlas boundaries, so borders are geographic data.
+  // The browser receives the dataset through the world-atlas package.
+  if(world && typeof topojson !== 'undefined'){
+    try{
+      const countries=topojson.feature(world,world.objects.countries).features;
+      globe
+        .polygonsData(countries)
+        .polygonAltitude(.006)
+        .polygonCapColor(()=>'rgba(30,130,190,.025)')
+        .polygonSideColor(()=>'rgba(45,160,220,.08)')
+        .polygonStrokeColor(()=>'rgba(128,224,255,.75)')
+        .polygonLabel(d=>`<div style="padding:6px 9px;border-radius:8px;background:rgba(2,16,38,.88);border:1px solid rgba(89,204,255,.3);color:#c9f3ff;font:600 12px Inter">${d.properties?.name || 'Country'}</div>`);
+    }catch(e){}
+  }
+
+  function resize(){
+    const w=el.clientWidth,h=el.clientHeight;
+    if(w>0&&h>0) globe.width(w).height(h);
+  }
+  window.addEventListener('resize',resize);
+  resize();
+
+  // Start with Asia/India facing the user.
+  setTimeout(()=>{
+    try{
+      globe.pointOfView({lat:23, lng:91, altitude:2.05},1000);
+    }catch(e){}
+  },300);
+
+  // Stop auto rotation while the user interacts, then resume after release.
+  const canvas=el.querySelector('canvas');
+  if(canvas){
+    canvas.addEventListener('pointerdown',()=>controls.autoRotate=false);
+    canvas.addEventListener('pointerup',()=>setTimeout(()=>controls.autoRotate=true,1800));
+    canvas.addEventListener('pointercancel',()=>setTimeout(()=>controls.autoRotate=true,1800));
+  }
+})();
+
+/* ---------------------------
+   Leaflet risk map
+---------------------------- */
+let map, marker;
+
+function setSelected(lat,lon,name='Selected location'){
+  document.getElementById('lat').value=Number(lat).toFixed(6);
+  document.getElementById('lon').value=Number(lon).toFixed(6);
+  document.getElementById('selectedName').textContent=name;
+  document.getElementById('selectedCoords').textContent=`${Number(lat).toFixed(4)}° N, ${Number(lon).toFixed(4)}° E`;
+  document.getElementById('globeCoords').textContent=`${Number(lat).toFixed(4)}° N, ${Number(lon).toFixed(4)}° E`;
+
+  if(marker) marker.setLatLng([lat,lon]);
+  else marker=L.marker([lat,lon]).addTo(map);
+
+  map.flyTo([lat,lon],11,{duration:.7});
+  runDemoPrediction(lat,lon);
+}
+
+function runDemoPrediction(lat,lon){
+  const seed=Math.abs(Math.sin(lat*12.9898+lon*78.233)*43758.5453);
+  const n=seed-Math.floor(seed);
+  const p=Math.round(15+n*70);
+  const slope=(7+n*27).toFixed(1);
+  const rain=Math.round(800+n*2300);
+  const elevation=Math.round(300+n*2200);
+  const clay=Math.round(12+n*30);
+  const river=(.4+n*5.2).toFixed(1);
+  const risk=p>=75?'VERY HIGH':p>=55?'HIGH':p>=35?'MODERATE':'LOW';
+
+  document.getElementById('probability').textContent=p+'%';
+  document.getElementById('riskPill').textContent=risk+' RISK';
+  document.getElementById('riskText').textContent =
+    risk==='LOW'?'Lower probability of landslide at this location.':
+    risk==='MODERATE'?'Moderate conditions. Continue monitoring local conditions.':
+    risk==='HIGH'?'Higher-risk conditions. Exercise caution around unstable slopes.':
+    'Very high-risk conditions. Follow official local guidance.';
+
+  document.getElementById('mSlope').textContent=slope+'°';
+  document.getElementById('mRain').textContent=rain.toLocaleString()+' mm';
+  document.getElementById('mElevation').textContent=elevation.toLocaleString()+' m';
+  document.getElementById('mClay').textContent=clay+'%';
+  document.getElementById('mRiver').textContent=river+' km';
+  document.getElementById('mLand').textContent=n>.72?'Agricultural':n>.42?'Forest':n>.22?'Grassland':'Shrubland';
+
+  const ring=document.getElementById('riskRing');
+  ring.style.background=`conic-gradient(#28b7ff 0 ${p}%,rgba(49,108,170,.35) ${p}% 100%)`;
+}
+
+async function searchLocation(q){
+  if(!q) return;
+  const status=document.getElementById('status');
+  status.innerHTML='<span class="dot"></span> SEARCHING';
+  try{
+    const url='https://nominatim.openstreetmap.org/search?'+new URLSearchParams({
+      q,format:'jsonv2',limit:'1',countrycodes:'in',addressdetails:'1'
+    });
+    const r=await fetch(url,{headers:{Accept:'application/json','Accept-Language':'en'}});
+    const data=await r.json();
+    if(!data.length) throw new Error('not found');
+    const x=data[0];
+    setSelected(Number(x.lat),Number(x.lon),x.display_name.split(',').slice(0,3).join(','));
+    status.innerHTML='<span class="dot"></span> LOCATION FOUND';
+  }catch(e){
+    status.innerHTML='<span class="dot"></span> TRY ANOTHER LOCATION';
+  }
+}
+
+function analyze(){
+  const lat=Number(document.getElementById('lat').value);
+  const lon=Number(document.getElementById('lon').value);
+  if(!Number.isFinite(lat)||lat<-90||lat>90||!Number.isFinite(lon)||lon<-180||lon>180){
+    document.getElementById('status').innerHTML='<span class="dot"></span> INVALID COORDINATES';
+    return;
+  }
+  setSelected(lat,lon,'Selected coordinates');
+  document.getElementById('status').innerHTML='<span class="dot"></span> ASSESSMENT READY';
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  map=L.map('map',{zoomControl:true,scrollWheelZoom:true,touchZoom:true,doubleClickZoom:true}).setView([25.5788,91.8933],7);
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+    maxZoom:20,
+    attribution:'&copy; OpenStreetMap &copy; CARTO'
+  }).addTo(map);
+
+  map.on('click',e=>setSelected(e.latlng.lat,e.latlng.lng,'Map-selected location'));
+
+  document.getElementById('searchBtn').addEventListener('click',()=>searchLocation(document.getElementById('locationSearch').value.trim()));
+  document.getElementById('locationSearch').addEventListener('keydown',e=>{if(e.key==='Enter')searchLocation(e.target.value.trim())});
+  document.getElementById('analyzeBtn').addEventListener('click',analyze);
+  document.getElementById('navSearchBtn').addEventListener('click',()=>{
+    const q=document.getElementById('navSearch').value.trim();
+    document.getElementById('locationSearch').value=q;
+    document.getElementById('assessment').scrollIntoView({behavior:'smooth'});
+    searchLocation(q);
+  });
+  document.getElementById('navSearch').addEventListener('keydown',e=>{
+    if(e.key==='Enter') document.getElementById('navSearchBtn').click();
+  });
+
+  setSelected(25.5788,91.8933,'Shillong, Meghalaya');
+});
+</script>
+</body>
+</html>

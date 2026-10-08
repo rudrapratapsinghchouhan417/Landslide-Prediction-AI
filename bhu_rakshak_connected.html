@@ -1,0 +1,1318 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>BhuRakshak | AI Landslide Early Warning System</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Leaflet GIS -->
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+
+    <!-- FontAwesome -->
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+
+    <!-- Google Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+        rel="stylesheet"
+    >
+
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ["DM Sans", "sans-serif"],
+                        display: ["Space Grotesk", "sans-serif"]
+                    },
+                    colors: {
+                        dark: "#0f172a",
+                        darker: "#020617",
+                        card: "#1e293b",
+                        primary: "#3b82f6",
+                        alert: "#ef4444",
+                        warning: "#f59e0b",
+                        safe: "#10b981"
+                    }
+                }
+            }
+        };
+    </script>
+
+    <style>
+        :root {
+            --bg: #020617;
+            --panel: rgba(15, 23, 42, 0.78);
+            --line: rgba(148, 163, 184, 0.16);
+            --muted: #94a3b8;
+            --cyan: #38bdf8;
+            --blue: #3b82f6;
+            --green: #34d399;
+            --amber: #fbbf24;
+            --red: #fb7185;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            min-height: 100%;
+            background: #020617;
+        }
+
+        body {
+            min-height: 100vh;
+            margin: 0;
+            overflow-x: hidden;
+            color: #f8fafc;
+            font-family: "DM Sans", sans-serif;
+            background:
+                radial-gradient(
+                    ellipse at 50% -20%,
+                    rgba(37, 99, 235, 0.22),
+                    transparent 46rem
+                ),
+                radial-gradient(
+                    ellipse at 0% 40%,
+                    rgba(14, 116, 144, 0.12),
+                    transparent 32rem
+                ),
+                radial-gradient(
+                    ellipse at 100% 70%,
+                    rgba(30, 64, 175, 0.13),
+                    transparent 34rem
+                ),
+                #020617;
+        }
+
+        /* Full-page starfield and space background */
+        body::before,
+        body::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        body::before {
+            z-index: -2;
+            opacity: 0.75;
+            background-image:
+                radial-gradient(
+                    circle at 12% 18%,
+                    rgba(255, 255, 255, 0.9) 0 1px,
+                    transparent 1.5px
+                ),
+                radial-gradient(
+                    circle at 73% 13%,
+                    rgba(125, 211, 252, 0.8) 0 1px,
+                    transparent 1.5px
+                ),
+                radial-gradient(
+                    circle at 38% 66%,
+                    rgba(255, 255, 255, 0.75) 0 1px,
+                    transparent 1.5px
+                ),
+                radial-gradient(
+                    circle at 88% 82%,
+                    rgba(125, 211, 252, 0.8) 0 1px,
+                    transparent 1.5px
+                ),
+                radial-gradient(
+                    circle at 56% 42%,
+                    rgba(255, 255, 255, 0.65) 0 1px,
+                    transparent 1.5px
+                );
+            background-size:
+                240px 240px,
+                320px 320px,
+                280px 280px,
+                360px 360px,
+                420px 420px;
+            animation: stars-drift 45s linear infinite;
+        }
+
+        body::after {
+            z-index: -3;
+            opacity: 0.55;
+            background:
+                radial-gradient(
+                    ellipse at 20% 25%,
+                    rgba(30, 64, 175, 0.2),
+                    transparent 28rem
+                ),
+                radial-gradient(
+                    ellipse at 85% 58%,
+                    rgba(8, 145, 178, 0.16),
+                    transparent 28rem
+                ),
+                radial-gradient(
+                    ellipse at 55% 100%,
+                    rgba(76, 29, 149, 0.12),
+                    transparent 32rem
+                );
+            filter: blur(30px);
+        }
+
+        @keyframes stars-drift {
+            from {
+                transform: translate3d(0, 0, 0);
+            }
+            to {
+                transform: translate3d(-25px, 18px, 0);
+            }
+        }
+
+        h1, h2, h3, h4, .font-mono {
+            font-family: "Space Grotesk", sans-serif;
+        }
+
+        .glass-panel {
+            background: linear-gradient(
+                145deg,
+                rgba(30, 41, 59, 0.78),
+                rgba(15, 23, 42, 0.56)
+            );
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border: 1px solid var(--line);
+            box-shadow:
+                0 20px 60px rgba(0, 0, 0, 0.25),
+                inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        }
+
+        .glass-panel:hover {
+            border-color: rgba(56, 189, 248, 0.26);
+        }
+
+        .metric-card {
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.25s ease, border-color 0.25s ease;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(56, 189, 248, 0.34);
+        }
+
+        .metric-card::after {
+            content: "";
+            position: absolute;
+            width: 90px;
+            height: 90px;
+            right: -28px;
+            bottom: -35px;
+            border-radius: 999px;
+            background: rgba(56, 189, 248, 0.09);
+            filter: blur(4px);
+        }
+
+        .section-kicker {
+            color: #7dd3fc;
+            font-size: 0.7rem;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            display: inline-block;
+            box-shadow: 0 0 14px currentColor;
+        }
+
+        #earth-card {
+            min-height: 560px;
+            overflow: visible;
+        }
+
+        #earth-container {
+            position: relative;
+            width: min(100%, 680px);
+            height: 560px;
+            overflow: visible;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: grab;
+        }
+
+        #earth-container:active {
+            cursor: grabbing;
+        }
+
+        #earth-container canvas {
+            display: block;
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        .map-toolbar {
+            background: rgba(2, 6, 23, 0.82);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+            backdrop-filter: blur(10px);
+        }
+
+        .leaflet-container {
+            background: #0f172a;
+        }
+
+        .leaflet-control-zoom a {
+            background: #0f172a !important;
+            color: #cbd5e1 !important;
+            border-color: #334155 !important;
+        }
+
+        /* Custom styling for Leaflet Layer Control */
+        .leaflet-control-layers {
+            background: #0f172a !important;
+            color: #f8fafc !important;
+            border: 1px solid #334155 !important;
+            border-radius: 0.75rem !important;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4) !important;
+            font-family: "DM Sans", sans-serif !important;
+        }
+
+        .leaflet-control-layers-expanded {
+            padding: 10px 14px !important;
+        }
+
+        .leaflet-control-layers-list label {
+            cursor: pointer;
+            font-size: 0.8rem;
+            margin-bottom: 4px;
+        }
+
+        .leaflet-popup-content-wrapper,
+        .leaflet-popup-tip {
+            background: #0f172a;
+            color: white;
+        }
+
+        .leaflet-popup-content-wrapper {
+            border: 1px solid #334155;
+            box-shadow: 0 16px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        .leaflet-popup-content {
+            margin: 14px 16px;
+        }
+
+        .alert-pulse {
+            animation: pulse-border 2s infinite;
+        }
+
+        @keyframes pulse-border {
+            0% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+            }
+            70% {
+                box-shadow: 0 0 0 12px rgba(239, 68, 68, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+            }
+        }
+
+        .fade-in {
+            animation: fade-in 0.7s ease both;
+        }
+
+        @keyframes fade-in {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 1024px) {
+            #earth-card {
+                min-height: 500px;
+            }
+            #earth-container {
+                height: 500px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            #earth-card {
+                min-height: 390px;
+            }
+            #earth-container {
+                width: 100%;
+                height: 390px;
+            }
+            .leaflet-control-zoom {
+                display: none;
+            }
+        }
+
+        @media (max-width: 480px) {
+            #earth-card {
+                min-height: 330px;
+            }
+            #earth-container {
+                height: 330px;
+            }
+        }
+    </style>
+</head>
+
+<body class="antialiased">
+
+    <!-- Navigation -->
+    <nav class="fixed top-0 z-50 w-full glass-panel border-b border-slate-800/80">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid fa-mountain-sun text-sky-400 text-2xl"></i>
+                    <span class="font-display font-bold text-xl tracking-wider">
+                        BhuRakshak
+                    </span>
+                    <span class="hidden md:inline-block text-xs bg-sky-400/10 text-sky-300 px-2 py-1 rounded-full">
+                        NER Edition
+                    </span>
+                </div>
+
+                <div class="hidden md:flex items-center gap-5">
+                    <a href="#dashboard" class="text-sm text-slate-300 hover:text-sky-300 transition">
+                        Dashboard
+                    </a>
+                    <a href="#integration" class="text-sm text-slate-300 hover:text-sky-300 transition">
+                        API Integration
+                    </a>
+                    <span class="text-slate-600">|</span>
+                    <span class="text-xs text-slate-400">
+                        Team: Doraemon Ke Saathi
+                    </span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main>
+        <!-- Hero Section -->
+        <section class="pt-28 pb-12 px-4 max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+            <div class="fade-in">
+                <div class="section-kicker mb-4">
+                    Disaster intelligence platform
+                </div>
+
+                <h1 class="font-display text-4xl md:text-6xl font-bold mb-5 leading-tight">
+                    AI-Based
+                    <span class="text-sky-400">Early Warning</span>
+                    & Landslide Risk Monitoring
+                </h1>
+
+                <p class="text-slate-400 text-lg leading-relaxed mb-7 max-w-2xl">
+                    Combining rainfall, soil-moisture, slope, and terrain data
+                    with machine-learning predictions to calculate real-time
+                    landslide risk across the North Eastern Region.
+                </p>
+
+                <div class="flex flex-wrap items-center gap-3">
+                    <a href="#dashboard" class="inline-flex items-center bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-lg font-semibold transition shadow-lg shadow-blue-500/30">
+                        Launch Dashboard
+                        <i class="fa-solid fa-arrow-right ml-2"></i>
+                    </a>
+
+                    <span class="px-3 py-2 rounded-lg text-xs border border-amber-400/30 bg-amber-400/10 text-amber-300">
+                        <i class="fa-solid fa-flask mr-1"></i>
+                        AI Model Connected
+                    </span>
+                </div>
+
+                <div class="flex items-center gap-3 mt-5 text-xs text-slate-400">
+                    <span class="status-dot text-emerald-400 bg-emerald-400"></span>
+                    XGBoost prediction pipeline ready
+                    <span class="text-slate-600">•</span>
+                    Last sync:
+                    <span id="last-sync">just now</span>
+                </div>
+
+                <div class="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div class="metric-card glass-panel p-4 rounded-xl">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs text-slate-400">Sensor network</span>
+                            <i class="fa-solid fa-tower-broadcast text-emerald-400"></i>
+                        </div>
+                        <div class="text-2xl font-bold text-emerald-300 mt-3" id="active-sensors">24</div>
+                        <div class="text-xs text-slate-500 mt-1">Nodes reporting normally</div>
+                    </div>
+
+                    <div class="metric-card glass-panel p-4 rounded-xl">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs text-slate-400">Warning state</span>
+                            <i class="fa-solid fa-triangle-exclamation text-amber-400"></i>
+                        </div>
+                        <div class="text-2xl font-bold text-amber-300 mt-3" id="pending-alerts">3</div>
+                        <div class="text-xs text-slate-500 mt-1">Require attention</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="earth-card" class="relative rounded-2xl glass-panel flex items-center justify-center fade-in">
+                <div class="absolute top-4 left-4 z-10 bg-slate-950/80 px-3 py-2 rounded-lg text-xs text-slate-300 font-mono border border-slate-700">
+                    <i class="fa-solid fa-satellite-dish text-sky-400 animate-pulse mr-2"></i>
+                    Satellite terrain view
+                </div>
+
+                <div class="absolute bottom-5 left-5 z-10 text-xs text-slate-400">
+                    <span class="status-dot text-rose-400 bg-rose-400 mr-2"></span>
+                    NER monitoring region
+                </div>
+
+                <div id="earth-container" role="img" aria-label="Interactive Earth showing the North Eastern Region monitoring area"></div>
+            </div>
+        </section>
+
+        <!-- Main Dashboard -->
+        <section id="dashboard" class="px-4 py-8 max-w-[1400px] mx-auto">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+                <!-- GIS Map -->
+                <div class="lg:col-span-8 glass-panel rounded-2xl flex flex-col h-[600px] overflow-hidden relative">
+                    <div class="p-5 border-b border-slate-700/70 flex flex-col sm:flex-row gap-3 sm:justify-between sm:items-center bg-slate-900/50">
+                        <div>
+                            <div class="section-kicker mb-1">Geospatial intelligence</div>
+                            <h2 class="font-display font-semibold text-lg">
+                                <i class="fa-solid fa-map-location-dot mr-2 text-sky-400"></i>
+                                AI Landslide Susceptibility Map
+                            </h2>
+                        </div>
+
+                        <div class="flex flex-wrap gap-3 text-xs text-slate-300">
+                            <span class="flex items-center gap-1.5">
+                                <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]"></span>
+                                Low
+                            </span>
+                            <span class="flex items-center gap-1.5">
+                                <span class="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_#fbbf24]"></span>
+                                Moderate
+                            </span>
+                            <span class="flex items-center gap-1.5">
+                                <span class="w-2.5 h-2.5 rounded-full bg-rose-400 shadow-[0_0_8px_#fb7185]"></span>
+                                High
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="absolute top-24 left-5 z-[400] map-toolbar rounded-lg px-3 py-2 text-xs text-slate-300">
+                        <div class="flex items-center gap-2">
+                            <span class="status-dot text-emerald-400 bg-emerald-400"></span>
+                            Click anywhere on the map to analyze
+                        </div>
+                    </div>
+
+                    <div id="gis-map" class="flex-grow z-0"></div>
+                </div>
+
+                <!-- Explainable AI Panel -->
+                <div class="lg:col-span-4 glass-panel rounded-2xl p-6 flex flex-col gap-6">
+                    <div>
+                        <div class="section-kicker mb-1">Explainability layer</div>
+                        <h2 class="font-display font-semibold text-lg">
+                            <i class="fa-solid fa-microchip mr-2 text-sky-400"></i>
+                            Explainable AI Analysis
+                        </h2>
+                        <p class="text-xs text-slate-400 mt-2">
+                            Click any location on the map to run the XGBoost model and view its environmental factors.
+                        </p>
+                    </div>
+
+                    <div id="node-info" class="bg-slate-950/80 rounded-xl p-4 border border-slate-700">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="font-display font-bold text-xl" id="ui-location-name">
+                                    Select a Location
+                                </h3>
+                                <p class="text-sm text-slate-400 mt-1" id="ui-node-id">
+                                    Node ID: --
+                                </p>
+                            </div>
+
+                            <div class="text-right">
+                                <div class="text-3xl font-bold" id="ui-risk-score">--</div>
+                                <div class="text-xs font-semibold px-2 py-1 rounded mt-1 bg-slate-800 text-slate-300" id="ui-risk-label">
+                                    Awaiting Data
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-4 mt-6">
+                            <h4 class="text-sm font-semibold text-slate-300 border-b border-slate-700 pb-2">
+                                Risk Factors
+                            </h4>
+
+                            <div>
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span>Clay content</span>
+                                    <span id="ui-soil-val">--%</span>
+                                </div>
+                                <div class="w-full bg-slate-700 rounded-full h-1.5">
+                                    <div id="bar-soil" class="h-1.5 rounded-full transition-all duration-1000" style="width: 0%"></div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span>Annual rainfall</span>
+                                    <span id="ui-rain-val">-- mm/year</span>
+                                </div>
+                                <div class="w-full bg-slate-700 rounded-full h-1.5">
+                                    <div id="bar-rain" class="h-1.5 rounded-full transition-all duration-1000" style="width: 0%"></div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span>Slope</span>
+                                    <span id="ui-slope-val">--°</span>
+                                </div>
+                                <div class="w-full bg-slate-700 rounded-full h-1.5">
+                                    <div id="bar-slope" class="h-1.5 rounded-full transition-all duration-1000" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="ai-insight" class="mt-6 p-3 rounded bg-blue-900/20 border border-blue-800 text-sm text-blue-200 hidden">
+                            <i class="fa-solid fa-robot mr-2"></i>
+                            <span id="ai-insight-text">Model insight will appear here.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Trend Chart -->
+                <div class="lg:col-span-8 glass-panel rounded-2xl p-5">
+                    <div class="section-kicker mb-1">Time-series monitoring</div>
+                    <h2 class="font-display font-semibold text-lg mb-4">
+                        <i class="fa-solid fa-chart-line mr-2 text-sky-400"></i>
+                        7-Day Trend Analysis
+                    </h2>
+                    <div class="relative h-64 w-full">
+                        <canvas id="trendChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Automated Alerts -->
+                <div class="lg:col-span-4 glass-panel rounded-2xl p-5 flex flex-col">
+                    <div class="section-kicker mb-1">Automated response</div>
+                    <h2 class="font-display font-semibold text-lg mb-4">
+                        <i class="fa-solid fa-triangle-exclamation mr-2 text-amber-400"></i>
+                        Automated Alerts
+                    </h2>
+                    <div class="flex-grow overflow-y-auto space-y-3 pr-2" id="alerts-container"></div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- API Integration -->
+        <section id="integration" class="px-4 py-12 max-w-[1400px] mx-auto">
+            <div class="glass-panel rounded-2xl p-8 border border-sky-400/30">
+                <div class="section-kicker mb-2">Developer integration</div>
+                <h2 class="font-display text-2xl font-bold mb-4">
+                    <i class="fa-solid fa-code text-sky-400 mr-3"></i>
+                    Connect your Python/Flask XGBoost Backend
+                </h2>
+                <p class="text-slate-300 mb-6 max-w-3xl">
+                    This dashboard is connected directly to the Flask API running locally. Click a location on the map to send latitude and longitude to the trained XGBoost model.
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div class="bg-slate-950/80 p-4 rounded-xl border border-slate-700">
+                            <h3 class="text-sky-400 font-semibold mb-2">1. Flask XGBoost endpoint</h3>
+                            <p class="text-xs text-slate-400 mb-2">Running at <code>http://127.0.0.1:5000/predict</code></p>
+                            <pre class="text-xs text-green-400 overflow-x-auto"><code>POST /predict
+{
+  "latitude": 25.5788,
+  "longitude": 91.8933
+}
+
+Response:
+{
+  "probability": 82.41,
+  "risk": "Very High",
+  "elevation": 1520.4,
+  "slope": 28.7,
+  "rainfall": 1980.2,
+  "land_cover": 10,
+  "clay": 27.4,
+  "river_distance": 0.42
+}</code></pre>
+                        </div>
+
+                        <div class="bg-slate-950/80 p-4 rounded-xl border border-slate-700">
+                            <h3 class="text-sky-400 font-semibold mb-2">2. Map → AI workflow</h3>
+                            <p class="text-xs text-slate-400 mb-2">Click a point and the browser sends its coordinates to Flask.</p>
+                            <pre class="text-xs text-blue-300 overflow-x-auto"><code>map.on("click", async (e) =&gt; {
+  const response = await fetch(
+    "http://127.0.0.1:5000/predict",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        latitude: e.latlng.lat,
+        longitude: e.latlng.lng
+      })
+    }
+  );
+});</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800 mt-12 py-8 text-center text-slate-500 text-sm">
+        <p>Built for Smart India Hackathon 2026 | Problem Statement: SIH26001</p>
+        <p class="mt-2">Team: Doraemon Ke Saathi | Theme: Disaster Management</p>
+    </footer>
+
+    <!-- External Libraries -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Three.js Import Map -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <!-- Three.js Earth -->
+    <script type="module">
+        import * as THREE from "three";
+        import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+        const container = document.getElementById("earth-container");
+        const scene = new THREE.Scene();
+
+        const camera = new THREE.PerspectiveCamera(
+            35,
+            container.clientWidth / container.clientHeight,
+            0.1,
+            100
+        );
+
+        const renderer = new THREE.WebGLRenderer({
+            antialias: true,
+            alpha: true,
+            powerPreference: "high-performance"
+        });
+
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        container.appendChild(renderer.domElement);
+
+        const loader = new THREE.TextureLoader();
+
+        const textures = {
+            color: loader.load("https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg"),
+            normal: loader.load("https://threejs.org/examples/textures/planets/earth_normal_2048.jpg"),
+            specular: loader.load("https://threejs.org/examples/textures/planets/earth_specular_2048.jpg"),
+            clouds: loader.load("https://threejs.org/examples/textures/planets/earth_clouds_1024.png")
+        };
+
+        const earthGroup = new THREE.Group();
+        scene.add(earthGroup);
+
+        const earthGeometry = new THREE.SphereGeometry(2.25, 96, 96);
+        const earthMaterial = new THREE.MeshPhongMaterial({
+            map: textures.color,
+            normalMap: textures.normal,
+            specularMap: textures.specular,
+            specular: new THREE.Color(0x557799),
+            shininess: 18,
+            normalScale: new THREE.Vector2(0.6, 0.6)
+        });
+
+        const earth = new THREE.Mesh(earthGeometry, earthMaterial);
+        earthGroup.add(earth);
+
+        const cloudLayer = new THREE.Mesh(
+            new THREE.SphereGeometry(2.285, 96, 96),
+            new THREE.MeshPhongMaterial({
+                map: textures.clouds,
+                transparent: true,
+                opacity: 0.42,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending
+            })
+        );
+        earthGroup.add(cloudLayer);
+
+        const gridLayer = new THREE.Mesh(
+            new THREE.SphereGeometry(2.295, 48, 48),
+            new THREE.MeshBasicMaterial({
+                color: 0x38bdf8,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.055,
+                depthWrite: false
+            })
+        );
+        earthGroup.add(gridLayer);
+
+        const atmosphereMaterial = new THREE.ShaderMaterial({
+            uniforms: {
+                glowColor: { value: new THREE.Color(0x38bdf8) }
+            },
+            vertexShader: `
+                varying vec3 vNormal;
+                varying vec3 vWorldPosition;
+                void main() {
+                    vNormal = normalize(normalMatrix * normal);
+                    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+                    vWorldPosition = worldPosition.xyz;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform vec3 glowColor;
+                varying vec3 vNormal;
+                varying vec3 vWorldPosition;
+                void main() {
+                    vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
+                    float intensity = pow(0.72 - dot(vNormal, viewDirection), 3.0);
+                    gl_FragColor = vec4(glowColor, intensity * 0.62);
+                }
+            `,
+            side: THREE.BackSide,
+            blending: THREE.AdditiveBlending,
+            transparent: true,
+            depthWrite: false
+        });
+
+        const atmosphere = new THREE.Mesh(
+            new THREE.SphereGeometry(2.40, 96, 96),
+            atmosphereMaterial
+        );
+        earthGroup.add(atmosphere);
+
+        const markerMaterial = new THREE.MeshBasicMaterial({
+            color: 0xfb7185,
+            transparent: true,
+            opacity: 0.9
+        });
+
+        const marker = new THREE.Mesh(
+            new THREE.SphereGeometry(0.05, 20, 20),
+            markerMaterial
+        );
+
+        const latitude = THREE.MathUtils.degToRad(26);
+        const longitude = THREE.MathUtils.degToRad(92);
+        const markerRadius = 2.315;
+
+        marker.position.set(
+            markerRadius * Math.cos(latitude) * Math.cos(longitude),
+            markerRadius * Math.sin(latitude),
+            markerRadius * Math.cos(latitude) * Math.sin(longitude)
+        );
+        earthGroup.add(marker);
+
+        const markerRing = new THREE.Mesh(
+            new THREE.RingGeometry(0.075, 0.11, 40),
+            new THREE.MeshBasicMaterial({
+                color: 0xfb7185,
+                transparent: true,
+                opacity: 0.8,
+                side: THREE.DoubleSide
+            })
+        );
+        markerRing.position.copy(marker.position);
+        markerRing.lookAt(0, 0, 0);
+        earthGroup.add(markerRing);
+
+        const particleCount = 420;
+        const particlePositions = new Float32Array(particleCount * 3);
+
+        for (let i = 0; i < particleCount; i++) {
+            const radius = 2.75 + Math.random() * 1.25;
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos((Math.random() * 2) - 1);
+
+            particlePositions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+            particlePositions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+            particlePositions[i * 3 + 2] = radius * Math.cos(phi);
+        }
+
+        const particleGeometry = new THREE.BufferGeometry();
+        particleGeometry.setAttribute("position", new THREE.BufferAttribute(particlePositions, 3));
+
+        const particles = new THREE.Points(
+            particleGeometry,
+            new THREE.PointsMaterial({
+                color: 0x67e8f9,
+                size: 0.018,
+                transparent: true,
+                opacity: 0.72,
+                sizeAttenuation: true
+            })
+        );
+        scene.add(particles);
+
+        scene.add(new THREE.AmbientLight(0x9ec5ff, 1.25));
+
+        const sunlight = new THREE.DirectionalLight(0xffffff, 2.7);
+        sunlight.position.set(5, 3, 5);
+        scene.add(sunlight);
+
+        const rimLight = new THREE.PointLight(0x38bdf8, 2.4, 20);
+        rimLight.position.set(-5, 1, -4);
+        scene.add(rimLight);
+
+        camera.position.set(0, 0.12, 6.8);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.04;
+        controls.enableZoom = false;
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 0.38;
+        controls.minPolarAngle = Math.PI * 0.25;
+        controls.maxPolarAngle = Math.PI * 0.75;
+
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const elapsed = clock.getElapsedTime();
+
+            cloudLayer.rotation.y += 0.00028;
+            gridLayer.rotation.y -= 0.00006;
+            particles.rotation.y -= 0.00035;
+
+            const pulse = 1 + Math.sin(elapsed * 3) * 0.15;
+            markerRing.scale.set(pulse, pulse, pulse);
+            markerRing.material.opacity = 0.45 + Math.sin(elapsed * 3) * 0.25;
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function resizeEarth() {
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            if (!width || !height) return;
+
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+
+            renderer.setSize(width, height, false);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        }
+
+        window.addEventListener("resize", resizeEarth);
+        resizeEarth();
+        animate();
+    </script>
+
+    <!-- Dashboard Logic -->
+    <script>
+        // ================================================================
+        // BhuRakshak - Live XGBoost Frontend Integration
+        // ================================================================
+        const BACKEND_URL = "http://127.0.0.1:5000";
+        let predictionMarker = null;
+        let requestInProgress = false;
+
+        // Free OpenStreetMap base layer. No Mapbox token is required.
+        const osmLayer = L.tileLayer(
+            "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+            {
+                attribution: '&copy; OpenStreetMap contributors',
+                maxZoom: 19
+            }
+        );
+
+        const darkLayer = L.tileLayer(
+            "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+            {
+                attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+                subdomains: "abcd",
+                maxZoom: 20
+            }
+        );
+
+        const baseMaps = {
+            "OpenStreetMap": osmLayer,
+            "Dark Theme": darkLayer
+        };
+
+        const map = L.map("gis-map", {
+            zoomControl: true,
+            attributionControl: true,
+            minZoom: 5,
+            maxZoom: 19,
+            layers: [osmLayer]
+        }).setView([26.2, 91.5], 7);
+
+        L.control.layers(baseMaps, null, { position: "topright" }).addTo(map);
+
+        function getRiskColor(score) {
+            score = Number(score);
+            if (score >= 80) return "#fb7185";
+            if (score >= 60) return "#f97316";
+            if (score >= 30) return "#fbbf24";
+            return "#34d399";
+        }
+
+        function getRiskLabel(score) {
+            score = Number(score);
+            if (score >= 80) return "VERY HIGH";
+            if (score >= 60) return "HIGH";
+            if (score >= 30) return "MODERATE";
+            return "LOW";
+        }
+
+        function setRiskBadge(label, score) {
+            const labelUI = document.getElementById("ui-risk-label");
+            labelUI.innerText = label.toUpperCase();
+
+            if (score >= 80) {
+                labelUI.className = "text-xs font-bold px-2 py-1 rounded mt-1 bg-rose-900/50 text-rose-300 border border-rose-700";
+            } else if (score >= 60) {
+                labelUI.className = "text-xs font-bold px-2 py-1 rounded mt-1 bg-orange-900/50 text-orange-300 border border-orange-700";
+            } else if (score >= 30) {
+                labelUI.className = "text-xs font-bold px-2 py-1 rounded mt-1 bg-amber-900/50 text-amber-300 border border-amber-700";
+            } else {
+                labelUI.className = "text-xs font-bold px-2 py-1 rounded mt-1 bg-emerald-900/50 text-emerald-300 border border-emerald-700";
+            }
+        }
+
+        function setLoadingState(latitude, longitude) {
+            document.getElementById("ui-location-name").innerText = "Analyzing Location...";
+            document.getElementById("ui-node-id").innerText =
+                `Coordinates: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+
+            const riskUI = document.getElementById("ui-risk-score");
+            riskUI.innerText = "...";
+            riskUI.style.color = "#38bdf8";
+            document.getElementById("ui-risk-label").innerText = "AI ANALYZING";
+
+            document.getElementById("ui-soil-val").innerText = "--%";
+            document.getElementById("ui-rain-val").innerText = "-- mm/year";
+            document.getElementById("ui-slope-val").innerText = "--°";
+            document.getElementById("bar-soil").style.width = "0%";
+            document.getElementById("bar-rain").style.width = "0%";
+            document.getElementById("bar-slope").style.width = "0%";
+
+            const insight = document.getElementById("ai-insight");
+            insight.className = "mt-6 p-3 rounded bg-blue-900/20 border border-blue-800 text-sm text-blue-200";
+            insight.classList.remove("hidden");
+            document.getElementById("ai-insight-text").innerText =
+                "Fetching elevation, slope, rainfall, land cover, clay content, river distance, and XGBoost susceptibility...";
+        }
+
+        function displayPrediction(latitude, longitude, result) {
+            const probability = Number(result.probability);
+            const risk = result.risk || getRiskLabel(probability);
+
+            document.getElementById("ui-location-name").innerText = "Selected Location";
+            document.getElementById("ui-node-id").innerText =
+                `Lat: ${latitude.toFixed(5)} | Lon: ${longitude.toFixed(5)}`;
+
+            const riskUI = document.getElementById("ui-risk-score");
+            riskUI.innerText = `${probability.toFixed(2)}%`;
+            riskUI.style.color = getRiskColor(probability);
+            setRiskBadge(risk, probability);
+
+            const slope = Number(result.slope);
+            const slopeScore = Math.min(Math.max((slope / 45) * 100, 0), 100);
+            document.getElementById("ui-slope-val").innerText = `${slope.toFixed(2)}°`;
+            const barSlope = document.getElementById("bar-slope");
+            barSlope.style.width = `${slopeScore}%`;
+            barSlope.style.backgroundColor = getRiskColor(slopeScore);
+
+            const rainfall = Number(result.rainfall);
+            document.getElementById("ui-rain-val").innerText = `${rainfall.toFixed(2)} mm/year`;
+            const rainfallScore = Math.min(Math.max((rainfall / 3000) * 100, 0), 100);
+            const barRain = document.getElementById("bar-rain");
+            barRain.style.width = `${rainfallScore}%`;
+            barRain.style.backgroundColor = getRiskColor(rainfallScore);
+
+            const clay = Number(result.clay);
+            document.getElementById("ui-soil-val").innerText = `${clay.toFixed(2)}%`;
+            const barSoil = document.getElementById("bar-soil");
+            const clayScore = Math.min(Math.max((clay / 50) * 100, 0), 100);
+            barSoil.style.width = `${clayScore}%`;
+            barSoil.style.backgroundColor = getRiskColor(clayScore);
+
+            const insight = document.getElementById("ai-insight");
+            insight.classList.remove("hidden");
+            insight.className = probability >= 80
+                ? "mt-6 p-3 rounded bg-rose-900/20 border border-rose-800 text-sm text-rose-200"
+                : probability >= 60
+                    ? "mt-6 p-3 rounded bg-orange-900/20 border border-orange-800 text-sm text-orange-200"
+                    : probability >= 30
+                        ? "mt-6 p-3 rounded bg-amber-900/20 border border-amber-800 text-sm text-amber-200"
+                        : "mt-6 p-3 rounded bg-blue-900/20 border border-blue-800 text-sm text-blue-200";
+
+            document.getElementById("ai-insight-text").innerText =
+                `XGBoost susceptibility is ${probability.toFixed(2)}% (${risk}). ` +
+                `Elevation: ${Number(result.elevation).toFixed(2)} m, ` +
+                `slope: ${slope.toFixed(2)}°, ` +
+                `annual rainfall: ${rainfall.toFixed(2)} mm/year, ` +
+                `clay content: ${clay.toFixed(2)}%, ` +
+                `river distance: ${Number(result.river_distance).toFixed(3)} km.`;
+
+            document.getElementById("last-sync").innerText = new Date().toLocaleTimeString();
+
+            if (predictionMarker) {
+                predictionMarker.setIcon(createPredictionIcon(probability));
+                predictionMarker.bindPopup(`
+                    <div style="min-width:250px">
+                        <div style="font-size:16px;font-weight:700;margin-bottom:8px;">
+                            Landslide Susceptibility
+                        </div>
+                        <div style="font-size:28px;font-weight:700;color:${getRiskColor(probability)};">
+                            ${probability.toFixed(2)}%
+                        </div>
+                        <div style="margin-top:5px;font-weight:700;color:${getRiskColor(probability)};">
+                            ${risk}
+                        </div>
+                        <hr style="border-color:#334155;margin:10px 0;">
+                        <div><b>Latitude:</b> ${latitude.toFixed(5)}</div>
+                        <div><b>Longitude:</b> ${longitude.toFixed(5)}</div>
+                        <div><b>Elevation:</b> ${Number(result.elevation).toFixed(2)} m</div>
+                        <div><b>Slope:</b> ${slope.toFixed(2)}°</div>
+                        <div><b>Annual Rainfall:</b> ${rainfall.toFixed(2)} mm/year</div>
+                        <div><b>Land Cover:</b> ${result.land_cover}</div>
+                        <div><b>Clay Content:</b> ${clay.toFixed(2)}%</div>
+                        <div><b>River Distance:</b> ${Number(result.river_distance).toFixed(3)} km</div>
+                    </div>
+                `).openPopup();
+            }
+        }
+
+        function createPredictionIcon(score) {
+            const color = getRiskColor(score);
+            const pulse = Number(score) >= 80 ? "animation: pulse 1.5s infinite;" : "";
+            return L.divIcon({
+                className: "prediction-pin",
+                iconAnchor: [10, 10],
+                popupAnchor: [0, -12],
+                html: `
+                    <div style="
+                        width:22px;
+                        height:22px;
+                        border-radius:50%;
+                        background:${color};
+                        border:3px solid #0f172a;
+                        box-shadow:0 0 18px ${color};
+                        ${pulse}
+                    "></div>
+                `
+            });
+        }
+
+        async function predictLocation(latitude, longitude) {
+            if (requestInProgress) return;
+            requestInProgress = true;
+
+            if (predictionMarker) {
+                map.removeLayer(predictionMarker);
+            }
+
+            predictionMarker = L.marker([latitude, longitude]).addTo(map);
+            predictionMarker.bindPopup(`
+                <div style="min-width:230px">
+                    <b>AI Analysis Running...</b><br><br>
+                    <span style="color:#94a3b8;font-size:12px">
+                        ${latitude.toFixed(5)}, ${longitude.toFixed(5)}
+                    </span>
+                </div>
+            `).openPopup();
+
+            setLoadingState(latitude, longitude);
+
+            try {
+                const response = await fetch(`${BACKEND_URL}/predict`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ latitude, longitude })
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || `Backend returned ${response.status}`);
+                }
+
+                displayPrediction(latitude, longitude, result);
+            } catch (error) {
+                console.error("Prediction error:", error);
+
+                document.getElementById("ui-location-name").innerText = "Prediction Failed";
+                document.getElementById("ui-node-id").innerText =
+                    `Lat: ${latitude.toFixed(5)} | Lon: ${longitude.toFixed(5)}`;
+                document.getElementById("ui-risk-score").innerText = "--";
+                document.getElementById("ui-risk-label").innerText = "ERROR";
+                document.getElementById("ui-risk-label").className =
+                    "text-xs font-bold px-2 py-1 rounded mt-1 bg-rose-900/50 text-rose-300 border border-rose-700";
+
+                const insight = document.getElementById("ai-insight");
+                insight.className = "mt-6 p-3 rounded bg-rose-900/20 border border-rose-800 text-sm text-rose-200";
+                insight.classList.remove("hidden");
+                document.getElementById("ai-insight-text").innerText =
+                    `${error.message}. Make sure app.py is running at ${BACKEND_URL}.`;
+
+                if (predictionMarker) {
+                    predictionMarker.bindPopup(`
+                        <div style="min-width:240px">
+                            <b style="color:#fb7185">Prediction Failed</b><br><br>
+                            ${escapeHtml(error.message)}
+                        </div>
+                    `).openPopup();
+                }
+            } finally {
+                requestInProgress = false;
+            }
+        }
+
+        function escapeHtml(value) {
+            return String(value)
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
+        }
+
+        // Main interaction: click anywhere on the map to run the AI model.
+        map.on("click", function (event) {
+            predictLocation(event.latlng.lat, event.latlng.lng);
+        });
+
+        // Alerts remain UI examples; they are not claimed to be live sensor alerts.
+        const alertsContainer = document.getElementById("alerts-container");
+
+        function addAlert(location, message, time, isCritical = false) {
+            const color = isCritical ? "text-rose-400" : "text-amber-400";
+            const border = isCritical ? "border-l-4 border-rose-400" : "border-l-4 border-amber-400";
+            const icon = isCritical
+                ? '<i class="fa-solid fa-triangle-exclamation text-rose-400 text-xl"></i>'
+                : '<i class="fa-solid fa-circle-info text-amber-400 text-xl"></i>';
+
+            alertsContainer.innerHTML += `
+                <div class="bg-slate-950/80 p-3 rounded-xl shadow ${border} flex gap-3 items-center">
+                    ${icon}
+                    <div class="flex-grow">
+                        <div class="flex justify-between gap-2">
+                            <span class="font-bold text-sm ${color}">${location}</span>
+                            <span class="text-xs text-slate-500 whitespace-nowrap">${time}</span>
+                        </div>
+                        <p class="text-xs text-slate-300 mt-1 leading-relaxed">${message}</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        addAlert(
+            "AI Map",
+            "Click any point on the map to fetch environmental data and run the trained XGBoost susceptibility model.",
+            "Ready",
+            false
+        );
+
+        addAlert(
+            "Backend",
+            "Flask prediction API expected at 127.0.0.1:5000.",
+            "Ready",
+            false
+        );
+
+        // Trend chart is a visual dashboard placeholder, not a live time-series feed.
+        const ctx = document.getElementById("trendChart").getContext("2d");
+        const gradientRisk = ctx.createLinearGradient(0, 0, 0, 400);
+        gradientRisk.addColorStop(0, "rgba(251, 113, 133, 0.42)");
+        gradientRisk.addColorStop(1, "rgba(251, 113, 133, 0)");
+
+        new Chart(ctx, {
+            type: "line",
+            data: {
+                labels: ["Day 1", "Day 2", "Day 3", "Day 4", "Day 5", "Day 6", "Today"],
+                datasets: [
+                    {
+                        label: "Example susceptibility score",
+                        data: [20, 25, 35, 60, 80, 85, 88],
+                        borderColor: "#fb7185",
+                        backgroundColor: gradientRisk,
+                        borderWidth: 2,
+                        tension: 0.4,
+                        fill: true,
+                        pointBackgroundColor: "#fb7185",
+                        pointBorderColor: "#0f172a",
+                        pointBorderWidth: 2
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: "#cbd5e1",
+                            usePointStyle: true,
+                            padding: 20
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: "#020617",
+                        borderColor: "#334155",
+                        borderWidth: 1,
+                        titleColor: "#f8fafc",
+                        bodyColor: "#cbd5e1"
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        grid: { color: "rgba(51, 65, 85, 0.55)" },
+                        ticks: { color: "#94a3b8" }
+                    },
+                    x: {
+                        grid: { color: "rgba(51, 65, 85, 0.35)" },
+                        ticks: { color: "#94a3b8" }
+                    }
+                }
+            }
+        });
+
+        // Initial panel state: no fake prediction is shown.
+        document.getElementById("last-sync").innerText = "waiting for map click";
+    </script>
+</body>
+</html>
