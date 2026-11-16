@@ -1,0 +1,9 @@
+
+{
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/bhu_rakshak_connected.html"
+    }
+  ]
+}
